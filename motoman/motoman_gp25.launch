@@ -1,0 +1,10 @@
+<launch>
+  <param name="robot_description" command="$(find xacro)/xacro --inorder '$(find sma-link)/motoman/urdf/gp25.xacro'" />
+  <node name="robot_state_publisher" pkg="robot_state_publisher" type="robot_state_publisher" />
+  <node pkg="sma-link" type="tf_euler.py" name="" />
+  <node pkg="sma-link" type="tf_lookup.py" name="" />
+  <rosparam command="load" file="$(find sma-link)/motoman/config.yaml" />
+  <node pkg="sma-link" type="r_socket.js" name="" output="screen" />
+  <node pkg="sma-link" type="r_client.js" name="" output="screen" />
+</launch>
+
