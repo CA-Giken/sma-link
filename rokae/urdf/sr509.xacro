@@ -1,0 +1,13 @@
+<?xml version="1.0" ?>
+<robot name="rokae_sr509" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find rokae_sr509_support)/urdf/sr509_macro.xacro" />
+  <xacro:rokae_sr509 prefix="" />
+
+  <link name="world" />
+  <joint name="joint_w" type="fixed">
+    <parent link="world" />
+    <origin xyz="0 0 0" />
+	<child link="base_link" />
+  </joint> -->
+
+</robot>

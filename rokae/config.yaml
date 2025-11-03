@@ -1,12 +1,12 @@
 config:
   rsocket:
-    robot_ip: "192.168.255.100"
+    robot_ip: "192.168.2.160"
     port: 8888
     delay: 100
     socket_timeout: 13
     capt_timeout: 10
     solve_timeout: 10
     recipe_timeout: 10
-    protocol: motoman
+    protocol: rokae
 #    update_frame_id: the frame r_socket.js will update, the alternative of ROS driver
 
