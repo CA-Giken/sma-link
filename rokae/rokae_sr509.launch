@@ -4,7 +4,7 @@
   <node pkg="sma-link" type="tf_euler.py" name="" />
   <node pkg="sma-link" type="tf_lookup.py" name="" />
   <node pkg="sma-link" type="r_socket.js" name="" respawn="true" respawn_delay="10" output="screen" />
-  <node pkg="sma-link" type="r_client.js" name="" output="screen" />  -->
+  <node pkg="sma-link" type="rclient_rokae.py" name="" output="screen" />
   <node pkg="rostopic" name="redraw" type="rostopic" args="pub -1 /request/redraw std_msgs/Bool True" />
 </launch>
 
