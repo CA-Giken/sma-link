@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const tflib=require('./tflib');
-tflib.option='sxyz rad';
+tflib.option='sxyz deg';
 
 const protocol=require('./protocol');
 protocol.tflib=tflib;
@@ -13,7 +13,7 @@ protocol.encode=async function(tf){
   euler[2]*=0.001;
   let tarr=[euler[0].toFixed(6),euler[1].toFixed(6),euler[2].toFixed(6)]
   let rarr=[euler[3].toFixed(6),euler[4].toFixed(6),euler[5].toFixed(6)]
-  return "["+tarr.concat(rarr).join(",")+"]";
+  return tarr.concat(rarr).join(",");
 }
 protocol.decode=async function(msg){
   let ary=protocol.decode_(msg);
