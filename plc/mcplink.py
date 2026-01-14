@@ -4,8 +4,8 @@ import numpy as np
 import json
 import roslib
 import rospy
-#import pymcprotocol
-import mcpdummy
+import pymcprotocol
+#import mcpdummy as plc
 
 from std_msgs.msg import Bool
 from std_msgs.msg import String
@@ -44,8 +44,8 @@ try:
 except Exception as e:
   print("get_param exception:",e.args)
 
-#plc = pymcprotocol.Type3E()
-plc=mcpdummy.DummyPLC()
+plc = pymcprotocol.Type3E()
+#plc=mcpdummy.DummyPLC()
 
 #### User define######################################
 def cb_do_capt(msg):
@@ -103,11 +103,16 @@ pub_reset=rospy.Publisher("/request/clear",Bool,queue_size=1)
 while True:
   if rospy.is_shutdown(): sys.exit()
 
-  plc.connect(Config["plc_ip"],Config["plc_port"])
+  try:
+    plc.connect(Config["plc_ip"],Config["plc_port"])
+  except Exception as e:
+    print('PLC connect failed',e)
+    continue
+
   if plc._is_connected:
     print("PLC connected")
   else:
-    print("PLC failed to connect")
+    print("PLC not connected")
     continue
 
   loop=True
