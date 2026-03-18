@@ -15,14 +15,16 @@ import sys
 Config={
   'plc_ip':'192.168.3.39',
   'plc_port':5376,
-  'inregs':'D100',
-  'outregs':'D104',
+  'inregs':'D4000',
+  'outregs':'D4004',
 }
 
 outputRegs=4*[0]
+outputChks=""
 inputRegs=4*[0]
 upEdge=0
 downEdge=0
+heartStat=False
 mTrue=Bool();mTrue.data=True
 mFalse=Bool();mFalse.data=False
 
@@ -45,7 +47,12 @@ except Exception as e:
   print("get_param exception:",e.args)
 
 plc = pymcprotocol.Type3E()
-#plc=mcpdummy.DummyPLC()
+#Available PLC types are
+#plc = pymcprotocol.Type3E(plctype="L")
+#plc = pymcprotocol.Type3E(plctype="QnA")
+#plc = pymcprotocol.Type3E(plctype="iQ-L")
+#plc = pymcprotocol.Type3E(plctype="iQ-R")
+#plc = mcpdummy.DummyPLC()
 
 #### User define######################################
 def cb_do_capt(msg):
@@ -85,10 +92,18 @@ def checkInRegs():
   if upEdge&1:
     pub_reset.publish(mTrue)
     queueOutput(1,0)   #Error code to 0 
+    queueOutput(0,False,4)    #busy bit to 0
+    queueOutput(0,False,5)    #busy bit to 0
+    queueOutput(0,False,6)    #busy bit to 0
 
 def checkParam():
   queueOutput(0,rospy.get_param('/dashboard/ind/sensors/stat'),1)   #Camera OK
   queueOutput(0,rospy.get_param('/dashboard/ind/rsocket/enable'),2)   #Robot OK
+
+def heartBeater(ev):
+  global heartStat
+  heartStat=not heartStat
+  queueOutput(0,heartStat,0)
 
 ###Pub Sub
 rospy.Subscriber("/request/capture",Bool,cb_do_capt)
@@ -99,25 +114,31 @@ rospy.Subscriber("/request/recipe",Bool,cb_do_recipe)
 rospy.Subscriber("/response/recipe",Bool,cb_done_recipe)
 rospy.Subscriber("/report",String,cb_error)
 pub_reset=rospy.Publisher("/request/clear",Bool,queue_size=1)
+pub_oregs=rospy.Publisher("/plc/oregs",String,queue_size=1)
+
+rospy.Timer(rospy.Duration(1),heartBeater)
 
 while True:
   if rospy.is_shutdown(): sys.exit()
 
+  plc.setaccessopt(commtype="ascii")
   try:
-    plc.connect(Config["plc_ip"],Config["plc_port"])
+    plc.connect(Config["plc_ip"],int(Config["plc_port"]))
   except Exception as e:
     print('PLC connect failed',e)
+    rospy.sleep(3)
     continue
 
   if plc._is_connected:
     print("PLC connected")
   else:
     print("PLC not connected")
+    rospy.sleep(3)
     continue
 
   loop=True
   while True:
-    rospy.sleep(0.33)
+    rospy.sleep(0.1)
     if rospy.is_shutdown():
       loop=False
       break
@@ -134,10 +155,11 @@ while True:
     checkParam()
     inputRegs=iregs
 
-    print(outputRegs)
+    if str(outputRegs) != outputChks: pub_oregs.publish(Config["outregs"]+":"+str(outputRegs))
 
     try:
       plc.batchwrite_wordunits(headdevice=Config['outregs'], values=outputRegs)
+      outputChks=str(outputRegs)
     except Exception as e:
       print('mcplink write failed',e)
       break
