@@ -17,6 +17,8 @@ Config={
   'plc_port':5376,
   'inregs':'D4000',
   'outregs':'D4004',
+  'retry':3,
+  'forget':10,
 }
 
 outputRegs=4*[0]
@@ -25,6 +27,8 @@ inputRegs=4*[0]
 upEdge=0
 downEdge=0
 heartStat=False
+errCount=0
+errTS=time.time()
 mTrue=Bool();mTrue.data=True
 mFalse=Bool();mFalse.data=False
 
@@ -38,6 +42,9 @@ def queueOutput(adds,val,bit=None):
       outputRegs[adds] = outputRegs[adds]|mask
     else:
       outputRegs[adds] = outputRegs[adds]&(~mask)
+
+def prtOutput():
+  rospy.set_param('/plc',outputRegs)
 
 ####ROS main###########################################
 rospy.init_node('mcplink',anonymous=True)
@@ -56,24 +63,37 @@ plc = pymcprotocol.Type3E()
 
 #### User define######################################
 def cb_do_capt(msg):
+  global errTS,errCount
   queueOutput(0,True,4)  #Busy bit
   queueOutput(1,0)   #Error code to 0
+  errTS=time.time()
+  prtOutput()
 def cb_done_capt(msg):
   queueOutput(0,False,4)
+  prtOutput()
 
 def cb_do_solve(msg):
+  global errTS,errCount
   queueOutput(0,True,5)  #Busy bit
   queueOutput(1,0)   #Error code to 0
+  errTS=time.time()
+  prtOutput()
 def cb_done_solve(msg):
   queueOutput(0,False,5)
+  prtOutput()
 
 def cb_do_recipe(msg):
+  global errTS,errCount
   queueOutput(0,True,6)  #Busy bit
   queueOutput(1,0)   #Error code to 0
+  errTS=time.time()
+  prtOutput()
 def cb_done_recipe(msg):
   queueOutput(0,False,6)
+  prtOutput()
 
 def cb_error(msg):
+  global errTS,errCount
   try:
     report=json.loads(msg.data)
   except Exception as e:
@@ -83,27 +103,39 @@ def cb_error(msg):
   if 'error' in report:
     err=report['error']
     if type(err) == list: err=err[0]
-    queueOutput(1,int(err))   #Error code
+    if int(err)!=0: errCount=errCount+1
+    if errCount<Config['retry']: queueOutput(1,0) #Error 0
+    elif outputRegs[1]==0: queueOutput(1,int(err))   #Error code
     queueOutput(0,False,4)    #busy bit to 0
     queueOutput(0,False,5)    #busy bit to 0
     queueOutput(0,False,6)    #busy bit to 0
+    prtOutput()
 
 def checkInRegs():
+  global errTS,errCount
   if upEdge&1:
     pub_reset.publish(mTrue)
     queueOutput(1,0)   #Error code to 0 
     queueOutput(0,False,4)    #busy bit to 0
     queueOutput(0,False,5)    #busy bit to 0
     queueOutput(0,False,6)    #busy bit to 0
+    prtOutput()
+    errTS=time.time()
+    errCount=0
 
 def checkParam():
   queueOutput(0,rospy.get_param('/dashboard/ind/sensors/stat'),1)   #Camera OK
   queueOutput(0,rospy.get_param('/dashboard/ind/rsocket/enable'),2)   #Robot OK
+  prtOutput()
 
 def heartBeater(ev):
-  global heartStat
+  global heartStat,errTS,errCount
   heartStat=not heartStat
   queueOutput(0,heartStat,0)
+  prtOutput()
+  tnow=time.time()
+  if tnow-errTS>Config['forget']: errCount=0;
+  errTS=tnow
 
 ###Pub Sub
 rospy.Subscriber("/request/capture",Bool,cb_do_capt)

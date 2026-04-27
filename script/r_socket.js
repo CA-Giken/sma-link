@@ -33,6 +33,7 @@ let Config={
   x1check:'/prepro/enable',
   reverse_frame_id:'',
   reverse_direction:1,
+  ngMask:{'param':'/plc','index':1},
 };
 let Param={
   post:'',
@@ -171,7 +172,7 @@ setImmediate(async function(){
     log_date=""
     log_time=""
     log_date,log_time = get_time();
-    rep.data=JSON.stringify({error:[0,0],day:log_date,time:log_time});
+    rep.data=JSON.stringify({day:log_date,time:log_time});
     pub_report.publish(rep);
   }
   function respOK_x2(conn,proto,cod){
@@ -194,7 +195,7 @@ setImmediate(async function(){
     log_time=""
     log_date,log_time = get_time();
     const cod_list = cod.split(',');
-    rep.data=JSON.stringify({error:[0,0],day:log_date,time:log_time,
+    rep.data=JSON.stringify({day:log_date,time:log_time,
       hosei_x:Number(cod_list[0]),hosei_y:Number(cod_list[1]),hosei_z:Number(cod_list[2]),
       hosei_rx:Number(cod_list[3]),hosei_ry:Number(cod_list[4]),hosei_rz:Number(cod_list[5])});
     pub_report.publish(rep);
@@ -225,7 +226,7 @@ setImmediate(async function(){
   }
   let TX1;
   const server = net.createServer(function(conn){
-    conn.setTimeout(Config.socket_timeout*1000);
+//    conn.setTimeout(Config.socket_timeout*1000);
     let buffer='';
     let msg='';
     let wdt=null;
@@ -471,6 +472,37 @@ setImmediate(async function(){
       }
       else respNG(conn,protocol,981);
     }
+    async function T0(){
+      respOK(conn,protocol);
+    }
+    async function T1(){
+      if(Math.random()>0.5){
+        respOK(conn,protocol);
+      }
+      else{
+        respNG(conn,protocol,911);
+      }
+    }
+    async function T2(){
+      let tf=new geometry_msgs.Transform();
+      tf.translation.x=0;
+      tf.translation.y=-300;
+      tf.translation.z=0;
+      tf.rotation.x=0.0;
+      tf.rotation.y=0.0;
+      tf.rotation.z=0.259;
+      tf.rotation.w=0.966;
+      try{
+        cod=await protocol.encode([tf]);
+      }
+      catch(e){
+        ros.log.error('r_socket::pose encode error '+e);
+        respNG(conn,protocol,999);
+        return;
+      }
+      respOK(conn,protocol,cod);
+    }
+
     conn.on('data',async function(data){
       buffer+=data.toString();
       ros.log.info("rsocket "+buffer+" "+data.toString());
@@ -489,7 +521,17 @@ setImmediate(async function(){
       let msgs=buffer.split(')');
       msg=msgs.shift().trim()+')';
       do{
-        if(msg.startsWith('X012')){//--------------------[X012] CLEAR|CAPT|SOLVE
+        let error=0;
+        try{
+          let prm=await rosNode.getParam(Config.ngMask.param);
+          error=Number(prm[Config.ngMask.index]);
+        }
+        catch(e){
+        }
+        if(error!=0){
+          respNG(conn,protocol,991);
+        }
+        else if(msg.startsWith('X012')){//--------------------[X012] CLEAR|CAPT|SOLVE
           conn.x012=true;
           X0();
         }
@@ -499,6 +541,9 @@ setImmediate(async function(){
         else if(msg.startsWith('X3')) X3();//ROVI_RECIPE
         else if(msg.startsWith('X7')) X7();//ROS command
         else if(msg.startsWith('X8')) X8();//ROS command
+        else if(msg.startsWith('T0')) T0();//Test
+        else if(msg.startsWith('T1')) T1();//Test
+        else if(msg.startsWith('T2')) T2();//Test
         else if(msg.startsWith('J6')){
           let j6=await protocol.decode_(msg.substr(2).trim());
           console.log("J6 "+protocol.tflib.option+' '+j6[0][0])
@@ -526,7 +571,7 @@ setImmediate(async function(){
       emitter.removeAllListeners();
       ros.log.warn('rsocket TIMEOUT');
       respNG(conn,protocol,408);
-     stat_out(false);
+      stat_out(false);
     });
     conn.on('error', function(err){
       ros.log.warn('Net:socket error '+err);
